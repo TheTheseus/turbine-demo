@@ -54,6 +54,14 @@ functions = []
 rest_functions = []
 
 print("Reading Tags CSV")
+
+# standardize metrics
+tags = pd.read_csv(asset_tags_file)
+clean = lambda x: {x: ''.join(re.findall(r'[a-zA-Z-_\d\s:]', x)).lower().strip().replace(' ', '_' )}
+updated_names_list = list(map(clean, tags["Metric"]))
+
+timestamp_column = ""
+
 with open(asset_tags_file, mode='r') as csv_file:
     csv_reader = csv.DictReader(csv_file)
     line_count = 0
@@ -66,25 +74,31 @@ with open(asset_tags_file, mode='r') as csv_file:
     dims = []
     constants = []
     funs = []
-    # dimension_columns = []
+    dimension_columns = []
 
     for row in csv_reader:
-        if line_count == 0:
-            print(f"row {row}")
+        # TODO, why skip first tag?
+        # if line_count == 0:
+            # print(f"headers {row}")
             # logging.debug("Column names are %s" % {", ".join(row)})
-            line_count += 1
-        else:
+            # print(f"headers {updated_names_list}")
+            # line_count += 1
+        # else:
             try:
-                parameter_value = row["Value"]
-                parameter_name = row["Metric"].lower().replace(" ", '-')
-                parameter_value = parameter_value.replace(" ", '-')
-                parameter_name = ''.join(re.findall(r'\w+', parameter_name))
+                print("printing row")
+                print(row)
+                parameter_value = row["Value"].replace(" ", '-')
+                # parameter_name = row["Metric"].lower().replace(" ", '-')
+                # parameter_value = parameter_value
+                # parameter_name = ''.join(re.findall(r'\w+', parameter_name))
+                parameter_name = list(updated_names_list[line_count].values())[0]
+                line_count += 1
                 print(f"{parameter_name} {parameter_value}")
                 logging.debug("Name %s" % parameter_name)
                 type = row["DataType"]
                 logging.debug("Type %s" % type)
                 logging.debug("Value %s" % parameter_value)
-
+                # continue
                 if parameter_name == "":
                     break  # No more rows
 
@@ -94,16 +108,21 @@ with open(asset_tags_file, mode='r') as csv_file:
                           row["Point_Data_Type"])
                     print(
                         "________________________ Point db function name  %s " % row["Function"])
-                    name = parameter_name
-                    type = row['DataType']
                     if 'string' in type.lower():  # string requires length
                         metrics.append(
                             Column(name, getattr(sqlalchemy, type)(50)))
+                    elif ('timestamp' in type.lower()) or (('datetime' in type.lower())):
+                        print("setting timestamp column " + parameter_name)
+                        timestamp_column = parameter_name
+                        metrics.append(Column(parameter_name, getattr(sqlalchemy, 'String')(50)))
+                        # metrics.append(Column(parameter_name, DateTime()))
+                        print(type)
+                        print("timestamp set")
                     else:
-                        metrics.append(
-                            Column(name, getattr(sqlalchemy, type)()))
+                        metrics.append(Column(parameter_name, getattr(sqlalchemy, type)()))
 
-                '''
+
+                # '''
                 # Create dimension
                 if row["Point_Data_Type"] == "D":
                     logging.debug("________________________ Point point_data_type dimension")
@@ -115,7 +134,7 @@ with open(asset_tags_file, mode='r') as csv_file:
                         unallowed_chars = "!@#$()"
                         for char in unallowed_chars:
                             dim['parameter_name'] = dim['parameter_name'].replace(char, "")
-                            dimension_columns.append(Column(metric['parameter_name'], String(50)))
+                        dimension_columns.append(Column(dim['parameter_name'], String(50)))
                         logging.debug("Adding cleansed dimension name to entity type %s" % dim['parameter_name'])
 
 
@@ -124,7 +143,7 @@ with open(asset_tags_file, mode='r') as csv_file:
                     logging.debug("________________________ Point point_data_type constant")
                     constant_to_add = {'parameter_name': parameter_name, 'type': type, 'value':parameter_value}
                     constants.append(constant_to_add)
-                '''
+                # '''
 
                 # Create Function
                 if row["Point_Data_Type"] == "F":
@@ -188,6 +207,7 @@ with open(asset_tags_file, mode='r') as csv_file:
                         f = bif.PythonExpression(
                             expression=expression, output_name=output_name)
                         functions.append(f)
+                        continue
                     else:
                         function_name = "PythonExpression"
                         expression = input_metrics[0]
@@ -196,8 +216,9 @@ with open(asset_tags_file, mode='r') as csv_file:
                         functions.append(f)
                         continue
             except:
+                logging.debug("error parsing tags")
                 logging.debug(sys.exc_info()[0])  # the exception instance
-                break
+                exit()
 
 
 columns = tuple(metrics)
@@ -226,7 +247,13 @@ db.drop_table(entity_type_name, schema = db_schema)
 # https://github.com/ibm-watson-iot/functions/blob/60002500117c4559ed256cb68204c71d2e62893d/iotfunctions/metadata.py#L2237
 ###
 
-columns = tuple(metrics)
+# entity = Turbines(
+#     name='kalonji_turbine_demo_1',
+#     table_name="kalonji_turbine_demo_1",
+#     db=db,
+#     db_schema=db_schema
+# )
+
 logging.debug("Creating Entity Type")
 entity = Turbines(
     name=entity_type_name,
@@ -234,11 +261,19 @@ entity = Turbines(
     db_schema=db_schema,
     columns=columns,
     functions=functions,
+    dimension_columns=dimension_columns,
     description="Equipment Turbines",
-    # generate_entities=True,
+    # generate_entities=['RWS79'],
     # asset_tags_file=asset_tags_file,
     table_name=entity_type_name
 )
+
+
+# entity.generate_dimension_data(entities=['RWS79'])
+
+# entity.read_meter_data(input_file=asset_series_data_file)
+# exit()
+
 
 logging.debug("Register EntityType")
 entity.register()  # raise_error=True, publish_kpis=True)
@@ -251,6 +286,9 @@ logging.debug(functions)
 # entity.publish_kpis()
 
 print(f"columns {columns}")
+
+#logging.debug("Create Calculated Metrics")
+# entity.publish_kpis()
 
 for payload in rest_functions:
     # entity_type.db.http_request(object_type='function', object_name=name, request='DELETE', payload=payload)
@@ -269,14 +307,17 @@ for payload in rest_functions:
         print(r.text)
     # entity.db.http_request('kpiFunctions', entity_type_name, 'POST', payload)
 
+logging.debug("Load Metrics Data")
+entity.read_meter_data(timestamp_column=timestamp_column, input_file=asset_series_data_file)
+
 logging.debug("Create Dimension")
 entity.make_dimension()
 
-logging.debug("Read Metrics Data")
-entity.read_meter_data(input_file=asset_series_data_file)
-
-#logging.debug("Create Calculated Metrics")
-# entity.publish_kpis()
+logging.debug("Registering Entity Ids")
+entity_ids = entity.entity_ids
+logging.debug(entity_ids)
+entity.generate_dimension_data(entities=entity_ids)
+logging.debug("Entity Ids Registered")
 
 meta = db.get_entity_type(entity_type_name)
 jobsettings = {
@@ -287,10 +328,10 @@ jobsettings = {
     '_db_schema': db_schema,
     'save_trace_to_file': True}
 
-logging.info('Instantiated create  job')
+logging.info('Instantiated create job')
 
-# job = JobController(meta, **jobsettings)
-# job.execute()
+job = JobController(meta, **jobsettings)
+job.execute()
 
 entity.exec_local_pipeline()
 

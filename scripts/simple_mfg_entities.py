@@ -102,6 +102,8 @@ class Turbines(metadata.BaseCustomEntityType):
                  db,
                  columns=[],
                  functions=[],
+                 dimension_columns=[],
+                 entity_ids=[],
                  db_schema=None,
                  description=None,
                  generate_days=0,
@@ -118,7 +120,7 @@ class Turbines(metadata.BaseCustomEntityType):
         logging.debug("db %s" %table_name)
         self.table_name = table_name.upper()
         logging.debug("table_name %s" %table_name)
-
+        self.entity_ids = []
         rows = []
 
         # Read CSV File with Entity Type Configuration
@@ -177,14 +179,14 @@ class Turbines(metadata.BaseCustomEntityType):
                          granularities = granularities,
                          columns=columns,
                          functions = functions,
-                         # dimension_columns = dimension_columns,
+                         dimension_columns = dimension_columns,
                          output_items_extended_metadata = output_items_extended_metadata,
                          generate_days = generate_days,
                          drop_existing = drop_existing,
                          description = description,
-                        db_schema = db_schema)
+                         db_schema = db_schema)
 
-    def read_meter_data(self, input_file=None):
+    def read_meter_data(self, timestamp_column=None, input_file=None):
         # Check to make sure table was created
 
         source_table_name = self.name # "Equipment"
@@ -192,24 +194,24 @@ class Turbines(metadata.BaseCustomEntityType):
         logging.debug("DB Schema %s " % self.db_schema)
 
 
-        # logging.debug(df.head())
-        # df.to_csv(f'../{self.name}.csv')
-
         if input_file:
-            df_to_import = pd.read_csv(input_file) #'/Users/carlos.ferreira1ibm.com/ws/shell/data/COMPRESSORS_D.csv')
-            logging.debug(df_to_import.head())
+            df_to_import = pd.read_csv(input_file)
+            print(df_to_import.head())
             df = df_to_import
             updated_names = {}
-            clean = lambda x: {x: ''.join(re.findall(r'\w+', x)).lower()}
+            # clean = lambda x: {x: ''.join(re.findall(r'\w+', x)).lower()} # remove everything that isn't alphanumeric
+            clean = lambda x: {x: ''.join(re.findall(r'[a-zA-Z-_\d\s:]', x)).lower().strip().replace(' ', '_' )} # remove everything that isn't alphanumeric except whitespace
             updated_names_list = list(map(clean, df.columns))
             for k in updated_names_list:
                 updated_names.update(k)
             df.rename(updated_names, axis=1, inplace=True)
-
+            print(df.columns)
+            print(df.head())
+            # print(df['ti_timestamp'])
         else:
             # nothing to import
             return
-            df = self.db.read_table(table_name=source_table_name.upper(), schema=self.db_schema)
+            # df = self.db.read_table(table_name=source_table_name.upper(), schema=self.db_schema)
 
         '''
         # write the dataframe to the database table
@@ -280,16 +282,27 @@ class Turbines(metadata.BaseCustomEntityType):
 
         # remove columns that are not required
         print("converting timestamp")
-        df['evt_timestamp'] = pd.to_datetime(df['datemmmddyyyy'].apply( lambda x: pd.Timestamp(datetime.strptime(x, '%m/%d/%y %H:%M'))  ))
+        # if 'ti_timestamp' in df.columns:
+        if timestamp_column in df.columns:
+            # date_format = '%d/%m/%Y %H:%M'
+            print(f"mapping timestamp {timestamp_column}")
+            date_format = '%m/%d/%y %H:%M'
+            df['evt_timestamp'] = pd.to_datetime(df[timestamp_column].apply( lambda x: pd.Timestamp(datetime.strptime(x, date_format))  ))
+            # df['evt_timestamp'] = pd.to_datetime(df['ti_timestamp'].apply( lambda x: pd.Timestamp(datetime.strptime(x, date_format))  ))
+
+        print("updated timestamp")
         df = df[required_cols]
-        df.to_csv("/tmp/output.csv")
+        pd.set_option('display.max_colwidth', -1)
+        # df.fillna(0)
         print(df.head())
-        # exit()
-        # write the dataframe to the database table
+        entity_ids = list(pd.unique(df['deviceid']))
+        self.entity_ids = entity_ids
         self.db.write_frame(df=df, table_name=self.table_name.upper(), if_exists='append')
         print("updated dataframe")
         kwargs = {'table_name': self.table_name.upper(), 'schema': self.db_schema, 'row_count': len(df.index)}
         self.trace_append(created_by=self, msg=f'Wrote input file {input_file} to table', log_method=logger.debug, **kwargs)
+        # entity_ids =
+        # self.generate_dimension_data(entities=entity_ids)
         return
 
     def make_sample_entity(self, db, schema=None, name='as_sample_entity', register=False, data_days=1, freq='1min',
@@ -468,4 +481,4 @@ class Equipment (metadata.BaseCustomEntityType):
                          generate_days = generate_days,
                          drop_existing = drop_existing,
                          description = description,
-                        db_schema = db_schema)
+                         db_schema = db_schema)
