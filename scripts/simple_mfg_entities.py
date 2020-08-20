@@ -114,6 +114,7 @@ class Turbines(metadata.BaseCustomEntityType):
                  ):
 
         # Initialize Entity Type class variables
+        pd.set_option('max_columns', None)
         self.db_schema = db_schema
         logging.debug("db_schema %s" %db_schema)
         self.db = db
@@ -121,26 +122,19 @@ class Turbines(metadata.BaseCustomEntityType):
         self.table_name = table_name.upper()
         logging.debug("table_name %s" %table_name)
         self.entity_ids = []
+        self.columns = columns
         rows = []
-
         # Read CSV File with Entity Type Configuration
-
-
         # constants
         constants = []
-
         physical_name = name.lower()
-
         # granularities
         granularities = []
-
         # columns
         # columns = []
-
         #for fun in functions_found:
         #    functions.append(bif.PythonExpression(expression='df["input_flow_rate"] * df["discharge_flow_rate"]',
         #                                          output_name='output_flow_rate'))
-
         '''
         sim = {
             'freq': '5min',
@@ -192,12 +186,10 @@ class Turbines(metadata.BaseCustomEntityType):
         source_table_name = self.name # "Equipment"
         logging.debug("DB Name %s " % source_table_name)
         logging.debug("DB Schema %s " % self.db_schema)
-
-
+        print(f'self.columns {self.columns}')
         if input_file:
-            df_to_import = pd.read_csv(input_file)
-            print(df_to_import.head())
-            df = df_to_import
+            print("input file detected")
+            df = pd.read_csv(input_file)
             updated_names = {}
             # clean = lambda x: {x: ''.join(re.findall(r'\w+', x)).lower()} # remove everything that isn't alphanumeric
             clean = lambda x: {x: ''.join(re.findall(r'[a-zA-Z-_\d\s:]', x)).lower().strip().replace(' ', '_' )} # remove everything that isn't alphanumeric except whitespace
@@ -206,8 +198,30 @@ class Turbines(metadata.BaseCustomEntityType):
                 updated_names.update(k)
             df.rename(updated_names, axis=1, inplace=True)
             print(df.columns)
+
+            print(f'dtypes {df.dtypes}')
+            # TODO, pandas 0.25 expects "object"
+            # cols = df.select_dtypes(include=['string']).columns.tolist()
+            try:
+                cols = df.select_dtypes(include=['object']).columns.tolist()
+            except:
+                print("check pandas version. v0.25 expects 'object', v1.1+ expects 'string")
+            print(f"string columns {cols}")
+            for c in cols:
+                df.loc[:, c].fillna("N/A", inplace = True)
+            cols = df.select_dtypes(include=['float64']).columns.tolist()
+            print(f"float columns {cols}")
+            for c in cols:
+                df.loc[:, c].fillna(0.0, inplace = True)
+            cols = df.select_dtypes(include=['int64']).columns.tolist()
+            print(f"int columns {cols}")
+            for c in cols:
+                df.loc[:, c].fillna(0, inplace = True)
+            print(df.columns)
             print(df.head())
-            # print(df['ti_timestamp'])
+            any_null = df.isnull().values.any()
+            print(f"any_null {any_null}")
+            print("columns renamed")
         else:
             # nothing to import
             return
@@ -257,10 +271,13 @@ class Turbines(metadata.BaseCustomEntityType):
 
         df = pd.DataFrame(data=response_back)
         '''
-
+        # exit()
         # use supplied column map to rename columns
         #df = df.rename(self.column_map, axis='columns')
         # fill in missing columns with nulls
+        #print(df.loc[[120]])
+        #print(df.loc[[123]])
+        #exit()
         required_cols = self.db.get_column_names(table=self.table_name, schema = self.db_schema)
         logging.debug("required_cols ")
         logging.debug(required_cols)
@@ -286,13 +303,16 @@ class Turbines(metadata.BaseCustomEntityType):
         if timestamp_column in df.columns:
             # date_format = '%d/%m/%Y %H:%M'
             print(f"mapping timestamp {timestamp_column}")
-            date_format = '%m/%d/%y %H:%M'
-            df['evt_timestamp'] = pd.to_datetime(df[timestamp_column].apply( lambda x: pd.Timestamp(datetime.strptime(x, date_format))  ))
+            date_format = '%d/%m/%Y %H:%M' #'%m/%d/%y %H:%M'
+            updated_timestamps = pd.to_datetime(df[timestamp_column].apply( lambda x: pd.Timestamp(datetime.strptime(x, date_format))  ))
+            df['evt_timestamp'] = updated_timestamps
+            df['updated_utc'] = updated_timestamps
             # df['evt_timestamp'] = pd.to_datetime(df['ti_timestamp'].apply( lambda x: pd.Timestamp(datetime.strptime(x, date_format))  ))
 
         print("updated timestamp")
         df = df[required_cols]
         pd.set_option('display.max_colwidth', -1)
+        print(df)
         # df.fillna(0)
         print(df.head())
         entity_ids = list(pd.unique(df['deviceid']))

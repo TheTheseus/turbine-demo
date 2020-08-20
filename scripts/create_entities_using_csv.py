@@ -110,16 +110,16 @@ with open(asset_tags_file, mode='r') as csv_file:
                         "________________________ Point db function name  %s " % row["Function"])
                     if 'string' in type.lower():  # string requires length
                         metrics.append(
-                            Column(name, getattr(sqlalchemy, type)(50)))
+                            Column(name, getattr(sqlalchemy, type)(50), nullable=True))
                     elif ('timestamp' in type.lower()) or (('datetime' in type.lower())):
                         print("setting timestamp column " + parameter_name)
                         timestamp_column = parameter_name
-                        metrics.append(Column(parameter_name, getattr(sqlalchemy, 'String')(50)))
+                        metrics.append(Column(parameter_name, getattr(sqlalchemy, 'String')(50), nullable=True ))
                         # metrics.append(Column(parameter_name, DateTime()))
                         print(type)
                         print("timestamp set")
                     else:
-                        metrics.append(Column(parameter_name, getattr(sqlalchemy, type)()))
+                        metrics.append(Column(parameter_name, getattr(sqlalchemy, type)(), nullable=True))
 
 
                 # '''
@@ -220,6 +220,7 @@ with open(asset_tags_file, mode='r') as csv_file:
                 logging.debug(sys.exc_info()[0])  # the exception instance
                 exit()
 
+metrics.append(Column('updated_utc', DateTime(), nullable=True))
 
 columns = tuple(metrics)
 print(f"columns {columns}")
@@ -255,6 +256,8 @@ db.drop_table(entity_type_name, schema = db_schema)
 # )
 
 logging.debug("Creating Entity Type")
+
+
 entity = Turbines(
     name=entity_type_name,
     db=db,
@@ -344,3 +347,6 @@ print(df.head())
 # TODO, add dimension calls
 
 #entity.read_meter_data( input_file="None")
+
+# df = db.read_table(table_name='kb_luny', schema=db_schema)
+# df1 = db.read_table(table_name='b_luny_docker', schema=db_schema)
