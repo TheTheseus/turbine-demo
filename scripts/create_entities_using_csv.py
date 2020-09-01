@@ -33,7 +33,6 @@ if (len(sys.argv) > 0):
     asset_series_data_file = sys.argv[3]
     credentials_path = sys.argv[4]
     logging.debug("entity_name %s" % entity_type_name)
-    # logging.debug("input_file %s" % input_file)
 else:
     logging.debug("Please provide path to csv file as script argument")
     exit()
@@ -60,7 +59,7 @@ tags = pd.read_csv(asset_tags_file)
 clean = lambda x: {x: ''.join(re.findall(r'[a-zA-Z-_\d\s:]', x)).lower().strip().replace(' ', '_' )}
 updated_names_list = list(map(clean, tags["Metric"]))
 
-timestamp_column = ""
+timestamp_columns = []
 
 with open(asset_tags_file, mode='r') as csv_file:
     csv_reader = csv.DictReader(csv_file)
@@ -75,7 +74,7 @@ with open(asset_tags_file, mode='r') as csv_file:
     constants = []
     funs = []
     dimension_columns = []
-
+    dimension_column_names = []
     for row in csv_reader:
         # TODO, why skip first tag?
         # if line_count == 0:
@@ -113,7 +112,7 @@ with open(asset_tags_file, mode='r') as csv_file:
                             Column(name, getattr(sqlalchemy, type)(50), nullable=True))
                     elif ('timestamp' in type.lower()) or (('datetime' in type.lower())):
                         print("setting timestamp column " + parameter_name)
-                        timestamp_column = parameter_name
+                        timestamp_columns.append(parameter_name)
                         metrics.append(Column(parameter_name, getattr(sqlalchemy, 'String')(50), nullable=True ))
                         # metrics.append(Column(parameter_name, DateTime()))
                         print(type)
@@ -135,6 +134,7 @@ with open(asset_tags_file, mode='r') as csv_file:
                         for char in unallowed_chars:
                             dim['parameter_name'] = dim['parameter_name'].replace(char, "")
                         dimension_columns.append(Column(dim['parameter_name'], String(50)))
+                        dimension_column_names.append(dim['parameter_name'])
                         logging.debug("Adding cleansed dimension name to entity type %s" % dim['parameter_name'])
 
 
@@ -262,13 +262,14 @@ entity = Turbines(
     name=entity_type_name,
     db=db,
     db_schema=db_schema,
+    table_name=entity_type_name,
     columns=columns,
     functions=functions,
     dimension_columns=dimension_columns,
-    description="Equipment Turbines",
+    description="Equipment Turbines"
     # generate_entities=['RWS79'],
     # asset_tags_file=asset_tags_file,
-    table_name=entity_type_name
+
 )
 
 
@@ -293,6 +294,19 @@ print(f"columns {columns}")
 #logging.debug("Create Calculated Metrics")
 # entity.publish_kpis()
 
+# TODO, finish dimensions once we figure out how they should be defined
+# https://www.ibm.com/support/knowledgecenter/SSQR84_monitor/iot/analytics/as_add_dimensions_api.html
+# https://www.ibm.com/support/knowledgecenter/SSQR84_monitor/iot/analytics/as_add_dimensions_code.html
+# df = pd.read_csv(asset_series_data_file)
+# for col in dimension_columns:
+#     print(col)
+#     url = "https://%s/api/kpi/v1/%s/entityType/%s/dimensional" % (
+#         credentials['iotp']['asHost'], credentials['tenantId'], entity_type_name)
+#     headers = {'Content-Type': "application/json", 'X-Api-Key': credentials['iotp']['apiKey'],
+#                'X-Api-Token': credentials['iotp']['apiToken'], 'Cache-Control': "no-cache", }
+#     payload = df[col]
+#     r = requests.post(url, headers=headers, json=payload)
+
 for payload in rest_functions:
     # entity_type.db.http_request(object_type='function', object_name=name, request='DELETE', payload=payload)
     print("posting payload")
@@ -311,15 +325,24 @@ for payload in rest_functions:
     # entity.db.http_request('kpiFunctions', entity_type_name, 'POST', payload)
 
 logging.debug("Load Metrics Data")
-entity.read_meter_data(timestamp_column=timestamp_column, input_file=asset_series_data_file)
+entity.read_meter_data(timestamp_columns=timestamp_columns, input_file=asset_series_data_file)
 
-logging.debug("Create Dimension")
-entity.make_dimension()
 
-logging.debug("Registering Entity Ids")
-entity_ids = entity.entity_ids
-logging.debug(entity_ids)
-entity.generate_dimension_data(entities=entity_ids)
+# entity.make_dimension(dim_table_name.upper(), Column('ship', String(50)) )
+# entity.generate_dimension_data(entities=entity_ids)
+
+# df_dim['devicetype'] = 'vv'
+# df_dim.fillna("N/A")
+# db.write_frame(df=df_dim, table_name=dim_table_name.upper(), if_exists='replace')
+# print(df_dim)
+# dim_table_name = self.table_name + '_dimension'
+# self.db.write_frame(df=df_dim, table_name=dim_table_name.upper(), if_exists='replace')
+# entity.generate_dimension_data(
+    # entities=entity_ids
+    # data_item_domain={
+    #     "devicetype": "vv"
+    # }
+# )
 logging.debug("Entity Ids Registered")
 
 meta = db.get_entity_type(entity_type_name)
@@ -344,9 +367,45 @@ print("DB Schema %s " % db_schema)
 df = db.read_table(table_name=entity_type_name, schema=db_schema)
 print(df.head())
 
+# Dimensions
+logging.debug("Registering Entity Ids")
+entity_ids = entity.entity_ids
+logging.debug(entity_ids)
+
+logging.debug(f"Create Dimension Columns {dimension_columns}")
+dim_table_name = entity_type_name + '_dimension'
+logging.debug("Dimension Columns Created")
+
+logging.debug(f"Dropping Dim Table {dim_table_name}")
+db.drop_table(dim_table_name, schema=db_schema)
+logging.debug(f"Making Dimension {dim_table_name}")
+# entity.make_dimension(dim_table_name) #, Column('ship', String(50)))
+entity.make_dimension(dim_table_name.upper()) #, *dimension_columns)
+entity.register(raise_error=True)
+entity.generate_dimension_data(entities=entity_ids)
+exit()
+
+logging.debug(f"Dimension {dim_table_name} registered")
+
+df_dim = pd.DataFrame(columns = dimension_column_names)
+df_dim['deviceid'] = entity_ids
+df_dim['devicetype'] = "N/A"
+df_dim.fillna("N/A")
+print(df_dim)
+logging.debug(f"Writing unmatched")
+# db.start_session()
+# table = db.get_table(table_name='kb_lun_0831_6_dimension', schema=db_schema)
+# for
+# db.write_frame(df=df_dim, table_name=dim_table_name.upper(), if_exists='replace')
+entity.write_unmatched_members(df_dim)
+logging.debug(f"Done")
+entity.generate_dimension_data(entities=entity_ids)
+
 # TODO, add dimension calls
 
 #entity.read_meter_data( input_file="None")
 
 # df = db.read_table(table_name='kb_luny', schema=db_schema)
 # df1 = db.read_table(table_name='b_luny_docker', schema=db_schema)
+
+# df = db.read_table(table_name='kb_luny_dimension', schema=db_schema)

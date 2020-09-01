@@ -18,7 +18,9 @@ logger = logging.getLogger(__name__)
 import datetime as dt
 import re
 from datetime import datetime
-
+import dateutil
+from dateutil import parser
+from dateutil.parser._parser import ParserError
 
 # BaseCustomEntityType
 class MergeSampleTimeSeries(BaseDataSource):
@@ -180,7 +182,7 @@ class Turbines(metadata.BaseCustomEntityType):
                          description = description,
                          db_schema = db_schema)
 
-    def read_meter_data(self, timestamp_column=None, input_file=None):
+    def read_meter_data(self, timestamp_columns=None, input_file=None):
         # Check to make sure table was created
 
         source_table_name = self.name # "Equipment"
@@ -300,30 +302,58 @@ class Turbines(metadata.BaseCustomEntityType):
         # remove columns that are not required
         print("converting timestamp")
         # if 'ti_timestamp' in df.columns:
-        if timestamp_column in df.columns:
-            # date_format = '%d/%m/%Y %H:%M'
+        if len(timestamp_columns) > 0 : #in df.columns:
+            # date_format = '%d-%m-%Y %H:%M:%S.%f' # '01-04-2020 00:00:36.938' # '%d/%m/%Y %H:%M' #'%m/%d/%y %H:%M'
+            date_format = '%Y-%m-%d %H:%M:%S.%f'
+            # TODO, use first timestamp column to standardize on?
+            timestamp_column = timestamp_columns[0]
             print(f"mapping timestamp {timestamp_column}")
-            date_format = '%d/%m/%Y %H:%M' #'%m/%d/%y %H:%M'
-            updated_timestamps = pd.to_datetime(df[timestamp_column].apply( lambda x: pd.Timestamp(datetime.strptime(x, date_format))  ))
+            updated_timestamps = pd.to_datetime(df[timestamp_column].apply( self.parse_input_dates))
+            # updated_timestamps = pd.to_datetime(df[timestamp_column].apply( lambda x: pd.Timestamp(dateutil.parser.parse(x)  )))
             df['evt_timestamp'] = updated_timestamps
             df['updated_utc'] = updated_timestamps
-            # df['evt_timestamp'] = pd.to_datetime(df['ti_timestamp'].apply( lambda x: pd.Timestamp(datetime.strptime(x, date_format))  ))
-
+        if len(timestamp_columns) > 1:
+            for col in timestamp_columns[1:]:
+                print(df[col])
+                df.loc[:, col] = pd.to_datetime(df[col].apply( self.parse_input_dates))
         print("updated timestamp")
         df = df[required_cols]
         pd.set_option('display.max_colwidth', -1)
         print(df)
         # df.fillna(0)
-        print(df.head())
         entity_ids = list(pd.unique(df['deviceid']))
+        # df_dim = pd.DataFrame(entity_ids)
+        # print(df_dim)
+        # dim_table_name = self.table_name + '_dimension'
+        # self.db.write_frame(df=df_dim, table_name=dim_table_name.upper(), if_exists='replace')
         self.entity_ids = entity_ids
+        print(df.head())
         self.db.write_frame(df=df, table_name=self.table_name.upper(), if_exists='append')
         print("updated dataframe")
         kwargs = {'table_name': self.table_name.upper(), 'schema': self.db_schema, 'row_count': len(df.index)}
         self.trace_append(created_by=self, msg=f'Wrote input file {input_file} to table', log_method=logger.debug, **kwargs)
-        # entity_ids =
         # self.generate_dimension_data(entities=entity_ids)
         return
+
+    def parse_input_dates(self, x):
+        print(f"attempting to parse date {x}")
+        try:
+            # d = datetime.strptime(x, date_format)
+            # d = pd.Timestamp(dateutil.parser.parse(x))
+            parsed_date = parser.parse(x)
+            # d = pd.Timestamp(parsed_date)
+            # return pd.Timestamp(d)
+            print(f"parsed date {x}")
+        except (ParserError, Exception, ValueError)  as p:
+            parsed_date = datetime.now()
+            # d = pd.Timestamp(datetime.now())
+            # return pd.Timestamp(d)
+            print(f"error parsing date {x}")
+        d = pd.Timestamp(parsed_date)
+        return pd.Timestamp(d)
+
+        # finally:
+            # return pd.Timestamp(d)
 
     def make_sample_entity(self, db, schema=None, name='as_sample_entity', register=False, data_days=1, freq='1min',
                            entity_count=5, float_cols=5, string_cols=2, bool_cols=2, date_cols=2, drop_existing=False,
