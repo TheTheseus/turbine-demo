@@ -20,7 +20,7 @@ import re
 from datetime import datetime
 import dateutil
 from dateutil import parser
-from dateutil.parser._parser import ParserError
+# from dateutil.parser._parser import ParserError
 
 # BaseCustomEntityType
 class MergeSampleTimeSeries(BaseDataSource):
@@ -336,24 +336,19 @@ class Turbines(metadata.BaseCustomEntityType):
         return
 
     def parse_input_dates(self, x):
-        print(f"attempting to parse date {x}")
         try:
             # d = datetime.strptime(x, date_format)
             # d = pd.Timestamp(dateutil.parser.parse(x))
             parsed_date = parser.parse(x)
-            # d = pd.Timestamp(parsed_date)
-            # return pd.Timestamp(d)
-            print(f"parsed date {x}")
-        except (ParserError, Exception, ValueError)  as p:
+        # except (ParserError, Exception, ValueError)  as p:
+        except (Exception, ValueError)  as p:
+            # TODO, shouldn't use current date, temporary fix to confirm it's a valid datetime
+            # possibly just use last observed valid date?
             parsed_date = datetime.now()
             # d = pd.Timestamp(datetime.now())
-            # return pd.Timestamp(d)
             print(f"error parsing date {x}")
         d = pd.Timestamp(parsed_date)
         return pd.Timestamp(d)
-
-        # finally:
-            # return pd.Timestamp(d)
 
     def make_sample_entity(self, db, schema=None, name='as_sample_entity', register=False, data_days=1, freq='1min',
                            entity_count=5, float_cols=5, string_cols=2, bool_cols=2, date_cols=2, drop_existing=False,
