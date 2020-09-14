@@ -355,11 +355,10 @@ jobsettings = {
     'save_trace_to_file': True}
 
 logging.info('Instantiated create job')
-
 job = JobController(meta, **jobsettings)
 job.execute()
 
-entity.exec_local_pipeline()
+dim_table_name = entity_type_name + '_dimension'
 
 # Check to make sure table was created
 print("DB Name %s " % entity_type_name)
@@ -367,22 +366,31 @@ print("DB Schema %s " % db_schema)
 df = db.read_table(table_name=entity_type_name, schema=db_schema)
 print(df.head())
 
+# entity.make_dimension(dim_table_name) #, Column('ship', String(50)))
+# entity.make_dimension(dim_table_name.upper()) #, *dimension_columns)
+
+logging.debug(f"Register entity")
+entity.register(raise_error=True)
+
+# logging.debug(f"Execute local pipeline")
+# entity.exec_local_pipeline()
+
+# logging.debug(f"Dropping Dim Table {dim_table_name}")
+# db.drop_table(dim_table_name, schema=db_schema)
+
+logging.debug(f"Making Dimension Table {dim_table_name}")
+entity.make_dimension(dim_table_name.upper()) #, *dimension_columns)
+
+'''
 # Dimensions
+# breaking on entity ids as of migration 9/13
+exit()
 logging.debug("Registering Entity Ids")
 entity_ids = entity.entity_ids
 logging.debug(entity_ids)
-
-logging.debug(f"Create Dimension Columns {dimension_columns}")
-dim_table_name = entity_type_name + '_dimension'
-logging.debug("Dimension Columns Created")
-
-logging.debug(f"Dropping Dim Table {dim_table_name}")
-db.drop_table(dim_table_name, schema=db_schema)
-logging.debug(f"Making Dimension {dim_table_name}")
-# entity.make_dimension(dim_table_name) #, Column('ship', String(50)))
-entity.make_dimension(dim_table_name.upper()) #, *dimension_columns)
-entity.register(raise_error=True)
 entity.generate_dimension_data(entities=entity_ids)
+
+
 exit()
 
 logging.debug(f"Dimension {dim_table_name} registered")
@@ -409,3 +417,4 @@ entity.generate_dimension_data(entities=entity_ids)
 # df1 = db.read_table(table_name='b_luny_docker', schema=db_schema)
 
 # df = db.read_table(table_name='kb_luny_dimension', schema=db_schema)
+'''
