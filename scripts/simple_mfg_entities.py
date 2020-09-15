@@ -111,6 +111,8 @@ class Turbines(metadata.BaseCustomEntityType):
                  generate_days=0,
                  drop_existing=False,
                  generate_entities=None,
+                 date_format=None,
+                 date_column=None,
                  column_map = None,
                  table_name = None
                  ):
@@ -179,6 +181,8 @@ class Turbines(metadata.BaseCustomEntityType):
                          output_items_extended_metadata = output_items_extended_metadata,
                          generate_days = generate_days,
                          drop_existing = drop_existing,
+                         date_format=None,
+                         date_column=None,
                          description = description,
                          db_schema = db_schema)
 
@@ -302,21 +306,41 @@ class Turbines(metadata.BaseCustomEntityType):
         # remove columns that are not required
         print("converting timestamp")
         # if 'ti_timestamp' in df.columns:
-        if len(timestamp_columns) > 0 : #in df.columns:
-            # date_format = '%d-%m-%Y %H:%M:%S.%f' # '01-04-2020 00:00:36.938' # '%d/%m/%Y %H:%M' #'%m/%d/%y %H:%M'
-            date_format = '%Y-%m-%d %H:%M:%S.%f'
-            # TODO, use first timestamp column to standardize on?
+
+        # if date format and column provided
+        if self.date_format and self.date_column:
+            # no need to parse, parse with strptime
+            timestamp_column = self.date_column
+            updated_timestamps = pd.to_datetime(df[self.date_column].apply( lambda x: pd.Timestamp(datetime.strptime(x, self.date_format))  ))
+        # if date format provided
+        # select first detected timestamp column, parse using strptime
+        elif self.date_format and not self.date_column:
             timestamp_column = timestamp_columns[0]
-            print(f"mapping timestamp {timestamp_column}")
+            updated_timestamps = pd.to_datetime(df[timestamp_column].apply( lambda x: pd.Timestamp(datetime.strptime(x, self.date_format))  ))
+        # if date column provided
+        # - select column, infer format
+        elif self.date_column and not self.date_format:
+            timestamp_column = self.date_column
+            updated_timestamps = pd.to_datetime(df[self.date_column].apply( self.parse_input_dates))
+        # if neither provided
+        # - infer based on first timestamp column
+        # - TODO, infer for all dates in column get count of resulting format, use the most common
+        else:
+            timestamp_column = timestamp_columns[0]
             updated_timestamps = pd.to_datetime(df[timestamp_column].apply( self.parse_input_dates))
             # updated_timestamps = pd.to_datetime(df[timestamp_column].apply( lambda x: pd.Timestamp(dateutil.parser.parse(x)  )))
-            df['evt_timestamp'] = updated_timestamps
-            df['updated_utc'] = updated_timestamps
+        print(f"mapped timestamp {timestamp_column}")
+        df['evt_timestamp'] = updated_timestamps
+        df['updated_utc'] = updated_timestamps
+
+        # convert additional timestamps, infer as is
         if len(timestamp_columns) > 1:
-            for col in timestamp_columns[1:]:
+            print("converting additional timestamps")
+            timestamp_columns.remove(timestamp_column)
+            for col in timestamp_columns:
                 print(df[col])
                 df.loc[:, col] = pd.to_datetime(df[col].apply( self.parse_input_dates))
-        print("updated timestamp")
+        print("updated all timestamps")
         df = df[required_cols]
         pd.set_option('display.max_colwidth', -1)
         print(df)

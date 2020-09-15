@@ -23,11 +23,43 @@ from iotfunctions import system_function
 EngineLogging.configure_console_logging(logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+import argparse
+
 # from iotfunctions.db import http_request
 
 
 logging.debug("start")
 
+parser = argparse.ArgumentParser(description='Provide entity and csv information.')
+parser.add_argument('-n','--entity_name', dest='entity_type_name',
+                    help='Name of entity type')
+parser.add_argument('-t','--asset_tags', dest='asset_tags_file',
+                    help='Path to tags file')
+parser.add_argument('-d', '--data', dest='asset_series_data_file',
+                    help='Path to data csv file')
+parser.add_argument('-c' ,'--credentials', dest='credentials_path',
+                    help='Path to credentials')
+
+parser.add_argument('-f' ,'--dateformat', dest='date_format',
+                    help="Optional: Format of datapoint timestamp in strptime") #..\n ex. 2020-05-03 10:30:19.123 => '%Y-%m-%d %H:%M:%S.%f' Format will be inferred otherwise")
+parser.add_argument('-co' ,'--datecolumn', dest='date_column',
+                    help='Optional: Path to credentials')
+
+args = parser.parse_args()
+entity_type_name = args.entity_type_name
+credentials_path = args.credentials_path
+asset_tags_file = args.asset_tags_file
+asset_series_data_file = args.asset_series_data_file
+date_format = args.date_format
+date_column = args.date_column
+if None in [entity_type_name, credentials_path, asset_tags_file, asset_series_data_file]:
+    print("missing args, please ensure to provide values for entity_type_name, credentials_path, asset_tags_file, asset_series_data_file")
+    exit()
+
+# args['credentials_path']
+# print(args)
+# python3.7 scripts/create_entities_using_csv.py -n kb_stork_0915_2 -t ~/Downloads/TagNameEntityDefinition-Engine.csv -d ~/Downloads/CAT_SB.csv -c ~/projects/turbine-demo/credentials/monitor-demo-new.json
+'''
 if (len(sys.argv) > 0):
     entity_type_name = sys.argv[1]
     asset_tags_file = sys.argv[2]
@@ -37,6 +69,7 @@ if (len(sys.argv) > 0):
 else:
     logging.debug("Please provide path to csv file as script argument")
     exit()
+'''
 
 '''
 # Replace with a credentials dictionary or provide a credentials
@@ -77,19 +110,10 @@ with open(asset_tags_file, mode='r') as csv_file:
     dimension_columns = []
     dimension_column_names = []
     for row in csv_reader:
-        # TODO, why skip first tag?
-        # if line_count == 0:
-            # print(f"headers {row}")
-            # logging.debug("Column names are %s" % {", ".join(row)})
-            # print(f"headers {updated_names_list}")
-            # line_count += 1
-        # else:
             try:
                 print("printing row")
                 print(row)
                 parameter_value = row["Value"].replace(" ", '_')
-                # parameter_name = row["Metric"].lower().replace(" ", '-')
-                # parameter_value = parameter_value
                 # parameter_name = ''.join(re.findall(r'\w+', parameter_name))
                 parameter_name = list(updated_names_list[line_count].values())[0].replace('-', '_')
                 line_count += 1
@@ -98,7 +122,6 @@ with open(asset_tags_file, mode='r') as csv_file:
                 type = row["DataType"]
                 logging.debug("Type %s" % type)
                 logging.debug("Value %s" % parameter_value)
-                # continue
                 if parameter_name == "":
                     break  # No more rows
 
@@ -272,10 +295,11 @@ entity = Turbines(
     columns=columns,
     functions=functions,
     dimension_columns=dimension_columns,
+    date_column=date_column,
+    date_format=date_format,
     description="Equipment Turbines"
     # generate_entities=['RWS79'],
     # asset_tags_file=asset_tags_file,
-
 )
 
 
