@@ -7,6 +7,7 @@ import pandas as pd
 import sys
 import json
 import logging
+import sqlalchemy
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, func
 from iotfunctions import bif
 from iotfunctions.metadata import EntityType
@@ -86,11 +87,11 @@ with open(asset_tags_file, mode='r') as csv_file:
             try:
                 print("printing row")
                 print(row)
-                parameter_value = row["Value"].replace(" ", '-')
+                parameter_value = row["Value"].replace(" ", '_')
                 # parameter_name = row["Metric"].lower().replace(" ", '-')
                 # parameter_value = parameter_value
                 # parameter_name = ''.join(re.findall(r'\w+', parameter_name))
-                parameter_name = list(updated_names_list[line_count].values())[0]
+                parameter_name = list(updated_names_list[line_count].values())[0].replace('-', '_')
                 line_count += 1
                 print(f"{parameter_name} {parameter_value}")
                 logging.debug("Name %s" % parameter_name)
@@ -108,9 +109,13 @@ with open(asset_tags_file, mode='r') as csv_file:
                     print(
                         "________________________ Point db function name  %s " % row["Function"])
                     if 'string' in type.lower():  # string requires length
+                        print('string')
+                        print(parameter_name)
+                        type = "String"
                         metrics.append(
-                            Column(name, getattr(sqlalchemy, type)(50), nullable=True))
+                            Column(parameter_name, getattr(sqlalchemy, type)(50), nullable=True))
                     elif ('timestamp' in type.lower()) or (('datetime' in type.lower())):
+                        print('timestamp')
                         print("setting timestamp column " + parameter_name)
                         timestamp_columns.append(parameter_name)
                         metrics.append(Column(parameter_name, getattr(sqlalchemy, 'String')(50), nullable=True ))
@@ -118,6 +123,7 @@ with open(asset_tags_file, mode='r') as csv_file:
                         print(type)
                         print("timestamp set")
                     else:
+                        print('type: ' + type)
                         metrics.append(Column(parameter_name, getattr(sqlalchemy, type)(), nullable=True))
 
 
@@ -375,11 +381,11 @@ entity.register(raise_error=True)
 # logging.debug(f"Execute local pipeline")
 # entity.exec_local_pipeline()
 
-# logging.debug(f"Dropping Dim Table {dim_table_name}")
-# db.drop_table(dim_table_name, schema=db_schema)
+logging.debug(f"Dropping Dim Table {dim_table_name}")
+db.drop_table(dim_table_name, schema=db_schema)
 
 logging.debug(f"Making Dimension Table {dim_table_name}")
-entity.make_dimension(dim_table_name.upper()) #, *dimension_columns)
+entity.make_dimension(dim_table_name.upper()) #*dimension_columns)
 
 '''
 # Dimensions

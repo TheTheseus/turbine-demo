@@ -109,7 +109,7 @@ class Turbines(metadata.BaseCustomEntityType):
                  db_schema=None,
                  description=None,
                  generate_days=0,
-                 drop_existing=True,
+                 drop_existing=False,
                  generate_entities=None,
                  column_map = None,
                  table_name = None
