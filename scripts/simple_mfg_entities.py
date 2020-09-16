@@ -113,6 +113,7 @@ class Turbines(metadata.BaseCustomEntityType):
                  generate_entities=None,
                  date_format=None,
                  date_column=None,
+                 fill_null=None,
                  column_map = None,
                  table_name = None
                  ):
@@ -183,10 +184,11 @@ class Turbines(metadata.BaseCustomEntityType):
                          drop_existing = drop_existing,
                          date_format=date_format,
                          date_column=date_column,
+                         fill_null=fill_null,
                          description = description,
                          db_schema = db_schema)
 
-    def read_meter_data(self, timestamp_columns=None, input_file=None, date_format=None, date_column=None):
+    def read_meter_data(self, timestamp_columns=None, input_file=None, date_format=None, date_column=None, fill_null=None):
         # Check to make sure table was created
 
         source_table_name = self.name # "Equipment"
@@ -208,21 +210,26 @@ class Turbines(metadata.BaseCustomEntityType):
             print(f'dtypes {df.dtypes}')
             # TODO, pandas 0.25 expects "object"
             # cols = df.select_dtypes(include=['string']).columns.tolist()
-            try:
-                cols = df.select_dtypes(include=['object']).columns.tolist()
-            except:
-                print("check pandas version. v0.25 expects 'object', v1.1+ expects 'string")
-            print(f"string columns {cols}")
-            for c in cols:
-                df.loc[:, c].fillna("N/A", inplace = True)
-            cols = df.select_dtypes(include=['float64']).columns.tolist()
-            print(f"float columns {cols}")
-            for c in cols:
-                df.loc[:, c].fillna(0.0, inplace = True)
-            cols = df.select_dtypes(include=['int64']).columns.tolist()
-            print(f"int columns {cols}")
-            for c in cols:
-                df.loc[:, c].fillna(0, inplace = True)
+
+            if self.fill_null:
+                logging.debug("filling null values")
+                try:
+                    cols = df.select_dtypes(include=['object']).columns.tolist()
+                except:
+                    print("check pandas version. v0.25 expects 'object', v1.1+ expects 'string")
+                print(f"string columns {cols}")
+                for c in cols:
+                    df.loc[:, c].fillna("N/A", inplace = True)
+                cols = df.select_dtypes(include=['float64']).columns.tolist()
+                print(f"float columns {cols}")
+                for c in cols:
+                    df.loc[:, c].fillna(0.0, inplace = True)
+                cols = df.select_dtypes(include=['int64']).columns.tolist()
+                print(f"int columns {cols}")
+                for c in cols:
+                    df.loc[:, c].fillna(0, inplace = True)
+            else:
+                logging.debug("leaving null values as-is")
             print(df.columns)
             print(df.head())
             any_null = df.isnull().values.any()

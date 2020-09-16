@@ -45,6 +45,10 @@ parser.add_argument('-f' ,'--dateformat', dest='date_format',
 parser.add_argument('-co' ,'--datecolumn', dest='date_column',
                     help='Optional: Path to credentials')
 
+parser.add_argument('-fn' ,'--fill_null', action='store_true', dest='fill_null',
+                    help='Fill in null values')
+
+
 args = parser.parse_args()
 entity_type_name = args.entity_type_name
 credentials_path = args.credentials_path
@@ -52,6 +56,10 @@ asset_tags_file = args.asset_tags_file
 asset_series_data_file = args.asset_series_data_file
 date_format = args.date_format
 date_column = args.date_column
+if args.fill_null:
+    fill_null = True
+else:
+    fill_null = False
 if None in [entity_type_name, credentials_path, asset_tags_file, asset_series_data_file]:
     print("missing args, please ensure to provide values for entity_type_name, credentials_path, asset_tags_file, asset_series_data_file")
     exit()
@@ -355,7 +363,7 @@ for payload in rest_functions:
     # entity.db.http_request('kpiFunctions', entity_type_name, 'POST', payload)
 
 logging.debug("Load Metrics Data")
-entity.read_meter_data(timestamp_columns=timestamp_columns, input_file=asset_series_data_file, date_format=date_format, date_column=date_column)
+entity.read_meter_data(timestamp_columns=timestamp_columns, input_file=asset_series_data_file, date_format=date_format, date_column=date_column, fill_null=fill_null)
 
 
 # entity.make_dimension(dim_table_name.upper(), Column('ship', String(50)) )
