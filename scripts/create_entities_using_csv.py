@@ -355,7 +355,7 @@ for payload in rest_functions:
     # entity.db.http_request('kpiFunctions', entity_type_name, 'POST', payload)
 
 logging.debug("Load Metrics Data")
-entity.read_meter_data(timestamp_columns=timestamp_columns, input_file=asset_series_data_file)
+entity.read_meter_data(timestamp_columns=timestamp_columns, input_file=asset_series_data_file, date_format=date_format, date_column=date_column)
 
 
 # entity.make_dimension(dim_table_name.upper(), Column('ship', String(50)) )

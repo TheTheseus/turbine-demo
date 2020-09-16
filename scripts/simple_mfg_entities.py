@@ -181,12 +181,12 @@ class Turbines(metadata.BaseCustomEntityType):
                          output_items_extended_metadata = output_items_extended_metadata,
                          generate_days = generate_days,
                          drop_existing = drop_existing,
-                         date_format=None,
-                         date_column=None,
+                         date_format=date_format,
+                         date_column=date_column,
                          description = description,
                          db_schema = db_schema)
 
-    def read_meter_data(self, timestamp_columns=None, input_file=None):
+    def read_meter_data(self, timestamp_columns=None, input_file=None, date_format=None, date_column=None):
         # Check to make sure table was created
 
         source_table_name = self.name # "Equipment"
@@ -309,23 +309,30 @@ class Turbines(metadata.BaseCustomEntityType):
 
         # if date format and column provided
         if self.date_format and self.date_column:
-            # no need to parse, parse with strptime
-            timestamp_column = self.date_column
-            updated_timestamps = pd.to_datetime(df[self.date_column].apply( lambda x: pd.Timestamp(datetime.strptime(x, self.date_format))  ))
+            # no need to parse
+            logging.debug("date_format and date_column provided ")
+            logging.debug(f"{self.date_format} {self.date_column}")
+            timestamp_column = ''.join(re.findall(r'[a-zA-Z-_\d\s:]', self.date_column)).lower().strip().replace(' ', '_' )
+            updated_timestamps = pd.to_datetime(df[timestamp_column].apply( lambda x: pd.Timestamp(datetime.strptime(x, self.date_format))  ))
         # if date format provided
         # select first detected timestamp column, parse using strptime
         elif self.date_format and not self.date_column:
+            logging.debug("date_format provided ")
+            logging.debug(f"{self.date_format}")
             timestamp_column = timestamp_columns[0]
             updated_timestamps = pd.to_datetime(df[timestamp_column].apply( lambda x: pd.Timestamp(datetime.strptime(x, self.date_format))  ))
         # if date column provided
         # - select column, infer format
         elif self.date_column and not self.date_format:
-            timestamp_column = self.date_column
-            updated_timestamps = pd.to_datetime(df[self.date_column].apply( self.parse_input_dates))
+            logging.debug("date_column provided ")
+            logging.debug(f"{self.date_column}")
+            timestamp_column = ''.join(re.findall(r'[a-zA-Z-_\d\s:]', self.date_column)).lower().strip().replace(' ', '_' )
+            updated_timestamps = pd.to_datetime(df[timestamp_column].apply( self.parse_input_dates))
         # if neither provided
         # - infer based on first timestamp column
         # - TODO, infer for all dates in column get count of resulting format, use the most common
         else:
+            logging.debug("column and format not provided ")
             timestamp_column = timestamp_columns[0]
             updated_timestamps = pd.to_datetime(df[timestamp_column].apply( self.parse_input_dates))
             # updated_timestamps = pd.to_datetime(df[timestamp_column].apply( lambda x: pd.Timestamp(dateutil.parser.parse(x)  )))
