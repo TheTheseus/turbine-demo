@@ -60,6 +60,8 @@ if args.fill_null:
     fill_null = True
 else:
     fill_null = False
+print(fill_null)
+exit()
 if None in [entity_type_name, credentials_path, asset_tags_file, asset_series_data_file]:
     print("missing args, please ensure to provide values for entity_type_name, credentials_path, asset_tags_file, asset_series_data_file")
     exit()
@@ -103,6 +105,11 @@ updated_names_list = list(map(clean, tags["Metric"]))
 
 timestamp_columns = []
 
+
+# handle_metric()
+# handle_dimension()
+# handle_function()
+# handle_location()
 with open(asset_tags_file, mode='r') as csv_file:
     csv_reader = csv.DictReader(csv_file)
     line_count = 0
@@ -292,6 +299,14 @@ db.drop_table(entity_type_name, schema = db_schema)
 #     db_schema=db_schema
 # )
 
+
+'''
+# Drop previous dimension table
+dim_table_name = entity_type_name + '_dimension'
+logging.debug(f"Dropping Dim Table {dim_table_name}")
+db.drop_table(dim_table_name, schema=db_schema)
+'''
+
 logging.debug("Creating Entity Type")
 
 
@@ -396,8 +411,6 @@ logging.info('Instantiated create job')
 job = JobController(meta, **jobsettings)
 job.execute()
 
-dim_table_name = entity_type_name + '_dimension'
-
 # Check to make sure table was created
 print("DB Name %s " % entity_type_name)
 print("DB Schema %s " % db_schema)
@@ -412,9 +425,6 @@ entity.register(raise_error=True)
 
 # logging.debug(f"Execute local pipeline")
 # entity.exec_local_pipeline()
-
-logging.debug(f"Dropping Dim Table {dim_table_name}")
-db.drop_table(dim_table_name, schema=db_schema)
 
 logging.debug(f"Making Dimension Table {dim_table_name}")
 entity.make_dimension(dim_table_name.upper()) #*dimension_columns)
