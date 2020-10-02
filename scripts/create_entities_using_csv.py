@@ -60,8 +60,7 @@ if args.fill_null:
     fill_null = True
 else:
     fill_null = False
-print(fill_null)
-exit()
+
 if None in [entity_type_name, credentials_path, asset_tags_file, asset_series_data_file]:
     print("missing args, please ensure to provide values for entity_type_name, credentials_path, asset_tags_file, asset_series_data_file")
     exit()
@@ -299,10 +298,10 @@ db.drop_table(entity_type_name, schema = db_schema)
 #     db_schema=db_schema
 # )
 
+dim_table_name = entity_type_name + '_dimension'
 
 '''
 # Drop previous dimension table
-dim_table_name = entity_type_name + '_dimension'
 logging.debug(f"Dropping Dim Table {dim_table_name}")
 db.drop_table(dim_table_name, schema=db_schema)
 '''
@@ -420,8 +419,8 @@ print(df.head())
 # entity.make_dimension(dim_table_name) #, Column('ship', String(50)))
 # entity.make_dimension(dim_table_name.upper()) #, *dimension_columns)
 
-logging.debug(f"Register entity")
-entity.register(raise_error=True)
+# logging.debug(f"Register entity")
+# entity.register(raise_error=True)
 
 # logging.debug(f"Execute local pipeline")
 # entity.exec_local_pipeline()

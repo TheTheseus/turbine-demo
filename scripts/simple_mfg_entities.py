@@ -211,7 +211,7 @@ class Turbines(metadata.BaseCustomEntityType):
             # TODO, pandas 0.25 expects "object"
             # cols = df.select_dtypes(include=['string']).columns.tolist()
 
-            if self.fill_null:
+            if fill_null:
                 logging.debug("filling null values")
                 try:
                     cols = df.select_dtypes(include=['object']).columns.tolist()
