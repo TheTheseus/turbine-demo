@@ -20,7 +20,6 @@ The intended audience for this Code Pattern is application developers and other 
 
 * [BI_HTTPPreload](https://ibm.biz/BdzvyX) Python functions that allow you to collect IOT asset and sensor data from other IOT Platforms or data sources that can then be used to quickly monitor your assets in Watson IOT Platform Analytics.
 
-
 # Flow
 
 1. Setup your Python development environment
