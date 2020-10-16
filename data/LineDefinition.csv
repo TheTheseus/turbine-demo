@@ -1,0 +1,5 @@
+Metric,Value,Point_Data_Type,DataType,Function,Input Argument list of metric names,Input Arg Value,Input Arg Value Explanation,Calulate_Metric_name,Dim_Entity ID Value,,TagPath
+LINE_TIMESTAMP,,S,Timestamp,,,,,,,,
+Q,,S,Float,,,,,,,,
+P,,S,Float,,,,,,,,
+T,,S,Float,,,,,,,,

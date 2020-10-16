@@ -1,0 +1,31 @@
+# FULL LINE PROCESS:
+
+# Open a terminal and navigate to the folder where your CSV files are located
+cd xvedata
+
+# start container
+docker pull kkbankol/maximo-monitor
+docker run --name monitor-csv-importer -itd kkbankol/maximo-monitor bash
+
+# upload files
+docker cp Line1.csv monitor-csv-importer:/tmp
+docker cp Line2.csv monitor-csv-importer:/tmp
+docker cp Line3.csv monitor-csv-importer:/tmp
+docker cp LineDefinition.csv monitor-csv-importer:/tmp 
+docker cp LineCredentials.json monitor-csv-importer:/tmp 
+
+# enter container
+docker exec -it monitor-csv-importer bash
+
+# in container
+cd ~/turbine-demo
+git pull origin csv
+export PYTHONPATH=$(pwd)
+source venv/bin/activate
+
+# inject data
+python3.7 scripts/create_entities_using_csv.py --entity_name JE_LINE --asset_tags /tmp/LineDefinition.csv --data /tmp/Line1.csv --credentials /tmp/LineCredentials.json --dateformat '%d-%m-%Y %H:%M:%S.%f' --datecolumn LINE_TIMESTAMP
+python3.7 scripts/create_entities_using_csv.py --entity_name JE_LINE --asset_tags /tmp/LineDefinition.csv --data /tmp/Line2.csv --credentials /tmp/LineCredentials.json --dateformat '%d-%m-%Y %H:%M:%S.%f' --datecolumn LINE_TIMESTAMP
+python3.7 scripts/create_entities_using_csv.py --entity_name JE_LINE --asset_tags /tmp/LineDefinition.csv --data /tmp/Line3.csv --credentials /tmp/LineCredentials.json --dateformat '%d-%m-%Y %H:%M:%S.%f' --datecolumn LINE_TIMESTAMP
+
+# use Postman to create the dimensions 
