@@ -108,6 +108,22 @@ pip install -r requirements.txt
 ```
 pip install git+https://@github.com/ibm-watson-iot/functions.git@ --upgrade
 ```
+
+For Beta use:
+```
+pip install git+https://@github.com/ibm-watson-iot/functions.git@beta
+```
+
+For Production
+```
+pip install git+https://@github.com/ibm-watson-iot/functions.git@ --upgrade
+```
+
+Production
+```
+pip install git+https://@github.com/ibm-watson-iot/functions.git@production_2_0 --upgrade
+```
+
 * Set PYTHONPATH to your project directory:
 ```
 export PYTHONPATH="/Users/carlosferreira/Documents/workspace/turbine-demo"
